@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMA — Year-End Cash Flow Estimator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f6f2e8;
+    --paper-2:#efe9db;
+    --ink:#1c1a17;
+    --muted:#6f6a5e;
+    --muted-2:#8d8877;
+    --rule:rgba(28,26,23,.18);
+    --rule-strong:rgba(28,26,23,.38);
+    --scott:#9a3a24;
+    --scott-tint:#f0e0d8;
+    --bill:#33526b;
+    --bill-tint:#dde5ea;
+    --good:#3d5c3a;
+    --exp-red:#b8624f;
+    --inc-green:#6f8f5e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Source Serif 4', Georgia, 'Times New Roman', serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1000px;margin:0 auto;padding:56px 32px 96px;}
+  .mono{font-family:'IBM Plex Mono', 'SF Mono', Menlo, monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  header.masthead{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:22px;
+    margin-bottom:8px;
+  }
+  header.masthead .eyebrow{margin-bottom:14px;}
+  h1{
+    font-size:34px;
+    font-weight:600;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .subhead{
+    color:var(--muted);
+    font-size:15px;
+    font-style:italic;
+  }
+  .meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:8px 24px;
+    margin-top:18px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--muted);
+    letter-spacing:.02em;
+  }
+  section.plate{
+    margin-top:52px;
+    padding-top:26px;
+    border-top:1px solid var(--rule-strong);
+  }
+  .plate-label{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  .plate-num{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--muted-2);
+    letter-spacing:.1em;
+  }
+  h2{
+    font-size:21px;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .plate-note{
+    color:var(--muted);
+    font-size:14px;
+    margin:0 0 22px;
+    max-width:70ch;
+  }
+
+  /* ---- YTD actuals table ---- */
+  table.ytd{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+  }
+  table.ytd th, table.ytd td{
+    text-align:right;
+    padding:7px 10px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+  }
+  table.ytd th:first-child, table.ytd td:first-child{
+    text-align:left;
+    font-family:'Source Serif 4', serif;
+    font-size:14px;
+  }
+  table.ytd thead th{
+    border-bottom:1px solid var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    font-weight:500;
+    padding-bottom:8px;
+  }
+  table.ytd tbody tr td{border-bottom:1px solid var(--rule);}
+  table.ytd tr.total td{
+    border-top:1px solid var(--ink);
+    border-bottom:none;
+    font-weight:600;
+    padding-top:10px;
+  }
+  table.ytd tr.section td{
+    padding-top:16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    border-bottom:1px solid var(--rule);
+  }
+
+  .callout-row{
+    display:flex;
+    gap:20px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+  .callout{
+    flex:1;
+    min-width:200px;
+    border:1px solid var(--rule-strong);
+    padding:14px 16px;
+    background:var(--paper-2);
+  }
+  .callout .lbl{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .callout .val{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:22px;
+    font-weight:600;
+  }
+  .callout.scott{border-left:3px solid var(--scott);}
+  .callout.bill{border-left:3px solid var(--bill);}
+
+  /* ---- Assumptions / sliders ---- */
+  .assumption-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px 40px;
+  }
+  @media (max-width:720px){ .assumption-grid{grid-template-columns:1fr;} .partner-cols{grid-template-columns:1fr !important;} }
+
+  .field{margin-bottom:20px;}
+  .field-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:6px;
+  }
+  .field-label{font-size:14px;}
+  .field-value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    font-weight:600;
+  }
+  .field-value.exp{color:var(--exp-red);}
+  .field-value.inc{color:var(--inc-green);}
+  input[type=range].exp::-webkit-slider-thumb{background:var(--exp-red) !important; box-shadow:0 0 0 1px var(--exp-red) !important;}
+  input[type=range].exp::-moz-range-thumb{background:var(--exp-red) !important; box-shadow:0 0 0 1px var(--exp-red) !important;}
+  input[type=range].inc::-webkit-slider-thumb{background:var(--inc-green) !important; box-shadow:0 0 0 1px var(--inc-green) !important;}
+  input[type=range].inc::-moz-range-thumb{background:var(--inc-green) !important; box-shadow:0 0 0 1px var(--inc-green) !important;}
+  .field-sub{
+    font-size:11.5px;
+    color:var(--muted-2);
+    margin-top:4px;
+  }
+  input[type=range]{
+    width:100%;
+    -webkit-appearance:none;
+    appearance:none;
+    height:2px;
+    background:var(--rule-strong);
+    outline:none;
+    margin:8px 0 0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:13px; height:13px;
+    border-radius:50%;
+    background:var(--ink);
+    cursor:pointer;
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--ink);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:13px; height:13px;
+    border-radius:50%;
+    background:var(--ink);
+    cursor:pointer;
+    border:2px solid var(--paper);
+    box-shadow:0 0 0 1px var(--ink);
+  }
+  .partner-cols{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0 40px;
+  }
+  .partner-col{
+    padding-top:4px;
+  }
+  .partner-head{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.1em;
+    padding-bottom:10px;
+    margin-bottom:16px;
+    border-bottom:2px solid;
+  }
+  .partner-col.scott .partner-head{border-color:var(--scott); color:var(--scott);}
+  .partner-col.bill .partner-head{border-color:var(--bill); color:var(--bill);}
+  .partner-col.scott input[type=range]::-webkit-slider-thumb{background:var(--scott); box-shadow:0 0 0 1px var(--scott);}
+  .partner-col.bill input[type=range]::-webkit-slider-thumb{background:var(--bill); box-shadow:0 0 0 1px var(--bill);}
+  .partner-col.scott input[type=range]::-moz-range-thumb{background:var(--scott); box-shadow:0 0 0 1px var(--scott);}
+  .partner-col.bill input[type=range]::-moz-range-thumb{background:var(--bill); box-shadow:0 0 0 1px var(--bill);}
+
+  /* ---- Results ---- */
+  .headline-result{
+    text-align:center;
+    padding:34px 20px;
+    border:1px solid var(--ink);
+    background:var(--paper-2);
+    margin-bottom:28px;
+  }
+  .headline-result .eyebrow{margin-bottom:10px;}
+  .headline-result .big{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:46px;
+    font-weight:600;
+    letter-spacing:-.01em;
+  }
+  .headline-result .sub{
+    margin-top:8px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  .method-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:28px;
+    margin-top:8px;
+  }
+  .method{
+    border:1px solid var(--rule-strong);
+    padding:20px 22px;
+  }
+  .method h3{
+    font-size:15px;
+    margin:0 0 4px;
+  }
+  .method p.desc{
+    font-size:12.5px;
+    color:var(--muted);
+    margin:0 0 18px;
+  }
+  .split-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .split-row:last-child{border-bottom:none;}
+  .split-name{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:14px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .dot.scott{background:var(--scott);}
+  .dot.bill{background:var(--bill);}
+  .split-amount{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:17px;
+    font-weight:600;
+  }
+  .split-pct{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    color:var(--muted-2);
+  }
+
+  /* ---- Waterfall ---- */
+  .waterfall{margin-top:36px;}
+  .wf-row{
+    display:grid;
+    grid-template-columns:190px 1fr 120px;
+    align-items:center;
+    gap:14px;
+    padding:7px 0;
+    font-size:12.5px;
+  }
+  .wf-label{color:var(--muted);}
+  .wf-bar-track{height:14px; position:relative; background:transparent;}
+  .wf-bar{
+    height:14px;
+    background:var(--muted-2);
+  }
+  .wf-bar.pos{background:var(--good);}
+  .wf-bar.neg{background:var(--scott);}
+  .wf-bar.end{background:var(--ink);}
+  .wf-amount{
+    font-family:'IBM Plex Mono', monospace;
+    text-align:right;
+    font-size:12.5px;
+  }
+
+  details{margin-top:40px; border-top:1px solid var(--rule-strong); padding-top:18px;}
+  summary{
+    cursor:pointer;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+  }
+  details table.ytd{margin-top:18px;}
+
+  footer{
+    margin-top:60px;
+    padding-top:20px;
+    border-top:2px solid var(--ink);
+    font-size:12px;
+    color:var(--muted);
+  }
+  footer p{margin:0 0 10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Carlisle Moore Architects, Inc.</div>
+    <h1>Year-End Cash Flow Estimator</h1>
+    <div class="subhead">Live scenario model — built from actual P&amp;L through Aug 10, 2026, plus your planning assumptions to Dec 31</div>
+    <div class="meta-row">
+      <span>P&amp;L basis: cash · period Jan 1 – Aug 10, 2026</span>
+      <span id="todayLabel">today —</span>
+    </div>
+  </header>
+
+  <!-- PLATE 01 — YTD ACTUALS -->
+  <section class="plate">
+    <div class="plate-label"><span class="plate-num">01</span><h2>Year to Date, Actual</h2></div>
+    <p class="plate-note">Pulled directly from the P&amp;L export. Bill and Scott columns are QuickBooks' own income/expense allocation; "Shared" and "Not specified" are firm-level items not attributed to a partner.</p>
+
+    <table class="ytd">
+      <thead>
+        <tr><th>&nbsp;</th><th>Bill</th><th>Scott</th><th>Shared</th><th>Firm Total</th></tr>
+      </thead>
+      <tbody>
+        <tr class="section"><td colspan="5">Income</td></tr>
+        <tr><td>43500 Billable Expense Income</td><td>$22,610</td><td>$0</td><td>$0</td><td>$22,610</td></tr>
+        <tr><td>44100 Services</td><td>$962,367</td><td>$916,924</td><td>$0</td><td>$1,879,291</td></tr>
+        <tr><td>44105 Unapplied Cash Payment Income</td><td>$0</td><td>$0</td><td>$0</td><td>$0</td></tr>
+        <tr><td>44110 Uncategorized Income</td><td>$435</td><td>$0</td><td>$0</td><td>$435</td></tr>
+        <tr class="total"><td>Total Income</td><td>$985,413</td><td>$916,924</td><td>$0</td><td>$1,902,337</td></tr>
+
+        <tr class="section"><td colspan="5">Expenses</td></tr>
+        <tr><td>60000 Advertising &amp; Marketing</td><td>$11,729</td><td>$0</td><td>$350</td><td>$12,079</td></tr>
+        <tr><td>60015 Bank Charges &amp; Fees</td><td>$0</td><td>$0</td><td>$569</td><td>$569</td></tr>
+        <tr><td>60020 Car &amp; Truck</td><td>$293</td><td>$0</td><td>$0</td><td>$293</td></tr>
+        <tr><td>60035 Cleaning</td><td>$950</td><td>$0</td><td>$816</td><td>$1,766</td></tr>
+        <tr><td>60040 Computer Software</td><td>$0</td><td>$3,894</td><td>$26,664</td><td>$30,558</td></tr>
+        <tr><td>60050 Contractors</td><td>$59,469</td><td>$0</td><td>$0</td><td>$59,469</td></tr>
+        <tr><td>60065 Dues and Subscriptions</td><td>$0</td><td>$0</td><td>$4,497</td><td>$4,497</td></tr>
+        <tr><td>60085 Gas</td><td>$1,650</td><td>$537</td><td>$0</td><td>$2,187</td></tr>
+        <tr><td>60095 Insurance – Liability</td><td>$0</td><td>$0</td><td>$516</td><td>$516</td></tr>
+        <tr><td>60100 Insurance – General</td><td>$0</td><td>$0</td><td>$25,916</td><td>$25,916</td></tr>
+        <tr><td>60106 Insurance – Health, Staff</td><td>$9,465</td><td>$8,502</td><td>$0</td><td>$17,967</td></tr>
+        <tr><td>60115 Internet</td><td>$0</td><td>$0</td><td>$1,050</td><td>$1,050</td></tr>
+        <tr><td>60120 Job Supplies</td><td>$0</td><td>$0</td><td>$36</td><td>$36</td></tr>
+        <tr><td>60125 Legal &amp; Professional Services</td><td>$0</td><td>$0</td><td>$19,866</td><td>$19,866</td></tr>
+        <tr><td>60130 Meals &amp; Entertainment</td><td>$178</td><td>$113</td><td>$1,300</td><td>$1,591</td></tr>
+        <tr><td>60135 Office Supplies</td><td>$56</td><td>$1,373</td><td>$12,935</td><td>$14,364</td></tr>
+        <tr><td>60155 Payroll Processing Fee</td><td>$0</td><td>$0</td><td>$1,283</td><td>$1,283</td></tr>
+        <tr><td>60160 Payroll Taxes</td><td>$12,757</td><td>$10,719</td><td>$0</td><td>$23,476</td></tr>
+        <tr><td>60165 Phone</td><td>$1,380</td><td>$0</td><td>$2,422</td><td>$3,802</td></tr>
+        <tr><td>60170 Printing</td><td>$2,039</td><td>$1,408</td><td>$653</td><td>$4,165</td></tr>
+        <tr><td>60175 Professional Photography</td><td>$16,900</td><td>$1,150</td><td>$0</td><td>$18,050</td></tr>
+        <tr><td>60195 Rent &amp; Lease</td><td>$0</td><td>$0</td><td>$24,751</td><td>$24,751</td></tr>
+        <tr><td>60200 Repairs &amp; Maintenance</td><td>$0</td><td>$0</td><td>$167</td><td>$167</td></tr>
+        <tr><td>60202 Retirement Contributions</td><td>$4,305</td><td>$3,885</td><td>$0</td><td>$8,190</td></tr>
+        <tr><td>60205 Salary – Office (incl. bonuses)</td><td>$167,925</td><td>$135,667</td><td>$0</td><td>$303,592</td></tr>
+        <tr><td>60220 Taxes &amp; Licenses</td><td>$140</td><td>$133</td><td>$6,505</td><td>$6,779</td></tr>
+        <tr><td>60225 Travel</td><td>$0</td><td>$874</td><td>$0</td><td>$874</td></tr>
+        <tr><td>60240 Utilities</td><td>$0</td><td>$0</td><td>$2,037</td><td>$2,037</td></tr>
+        <tr><td>ASK</td><td>$0</td><td>$242</td><td>$3,509</td><td>$3,751</td></tr>
+        <tr class="total"><td>Total Expenses</td><td>$289,236</td><td>$168,497</td><td>$135,909</td><td>$593,641</td></tr>
+        <tr class="total"><td>Net Operating Income</td><td>$696,177</td><td>$748,427</td><td>($135,909)</td><td>$1,308,696</td></tr>
+
+        <tr class="section"><td colspan="5">Other Income</td></tr>
+        <tr><td>43520 Interest Income</td><td>$0</td><td>$0</td><td>$7,902</td><td>$7,902</td></tr>
+        <tr class="total"><td>Total Other Income</td><td>$0</td><td>$0</td><td>$7,902</td><td>$7,902</td></tr>
+
+        <tr class="section"><td colspan="5">Other Expenses</td></tr>
+        <tr><td>60105 Insurance – Health (Officer)</td><td>$14,594</td><td>$10,145</td><td>$0</td><td>$24,739</td></tr>
+        <tr><td>60210 Salary – Officers</td><td>$35,000</td><td>$35,000</td><td>$0</td><td>$70,000</td></tr>
+        <tr><td>60300 Payroll Tax – Officers</td><td>$2,826</td><td>$2,826</td><td>$0</td><td>$5,651</td></tr>
+        <tr class="total"><td>Total Other Expenses</td><td>$52,420</td><td>$47,971</td><td>$0</td><td>$100,390</td></tr>
+        <tr class="total"><td>Net Other Income</td><td>($52,420)</td><td>($47,971)</td><td>$7,902</td><td>($92,488)</td></tr>
+
+        <tr class="total" style="font-size:14.5px;"><td>Net Income</td><td>$643,757</td><td>$700,457</td><td>($127,941)</td><td>$1,216,207</td></tr>
+      </tbody>
+    </table>
+    <p class="plate-note" style="margin:10px 0 0; font-size:12px;">"Shared" column here also folds in the $65 "Not specified" line from the P&amp;L. Cash basis, Jan 1–Aug 10, 2026.</p>
+
+    <div class="callout-row">
+      <div class="callout bill">
+        <div class="lbl">Bill — effective YTD (shared costs split evenly)</div>
+        <div class="val">$579,754</div>
+      </div>
+      <div class="callout scott">
+        <div class="lbl">Scott — effective YTD (shared costs split evenly)</div>
+        <div class="val">$636,454</div>
+      </div>
+    </div>
+
+    <div class="method" style="margin-top:22px;">
+      <h3>Distributions Already Taken, 2026</h3>
+      <p class="desc">Distributions are an equity draw, not a P&amp;L expense — they never show up in Net Income above. But they DO get wired into the Plate 03 split below, explicitly, rather than being assumed away inside the starting bank balance. Here's why that matters: the bank balance nets these out at a flat 50/50 (that's how they were actually paid), but the year-end split is weighted by production — so if the split just used the post-distribution balance as-is, the flat 50/50 already taken would distort the weighted result. The toggle below controls how Plate 03 corrects for that.</p>
+      <div class="partner-cols">
+        <div class="partner-col scott">
+          <div class="field" style="margin-bottom:8px;">
+            <div class="field-top"><span class="field-label">Scott — distributions taken YTD</span><span class="field-value exp" id="v-scottDist"></span></div>
+            <input type="range" class="exp" id="s-scottDist" min="0" max="400000" step="1000" value="50000">
+            <div class="field-sub">April 2026 distribution, default $50,000</div>
+          </div>
+          <div class="split-row" style="border-top:1px solid var(--rule); margin-top:10px; padding-top:10px;">
+            <div class="split-name">Undistributed effective YTD profit</div>
+            <div class="split-amount" id="scottUndist"></div>
+          </div>
+        </div>
+        <div class="partner-col bill">
+          <div class="field" style="margin-bottom:8px;">
+            <div class="field-top"><span class="field-label">Bill — distributions taken YTD</span><span class="field-value exp" id="v-billDist"></span></div>
+            <input type="range" class="exp" id="s-billDist" min="0" max="400000" step="1000" value="50000">
+            <div class="field-sub">April 2026 distribution, default $50,000</div>
+          </div>
+          <div class="split-row" style="border-top:1px solid var(--rule); margin-top:10px; padding-top:10px;">
+            <div class="split-name">Undistributed effective YTD profit</div>
+            <div class="split-amount" id="billUndist"></div>
+          </div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="s-distReflected" checked style="width:16px; height:16px; margin:0;">
+        <label for="s-distReflected" class="field-sub" style="cursor:pointer;">Starting bank balance (Plate 02) was pulled <em>after</em> the April distributions went out</label>
+      </div>
+      <p class="field-sub" style="margin-top:6px;">Uncheck this if the $852,000 bank figure predates the April payout — Plate 03 will then treat the $100,000 as a future outflow still owed, instead of one already reflected in cash on hand.</p>
+    </div>
+  </section>
+
+  <!-- PLATE 02 — ASSUMPTIONS -->
+  <section class="plate">
+    <div class="plate-label"><span class="plate-num">02</span><h2>Assumptions to Year End</h2></div>
+    <p class="plate-note">Everything below is adjustable. Defaults are your Aug 10 planning numbers plus expense run-rate computed straight from the P&amp;L (~<span id="opexRateNote" class="mono"></span>/mo actual, vs. the flat $100k/mo estimate).</p>
+
+    <div class="assumption-grid">
+      <div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Starting bank balance (Aug 10)</span><span class="field-value" id="v-bank"></span></div>
+          <input type="range" id="s-bank" min="500000" max="1200000" step="1000" value="852000">
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Months remaining to Dec 31</span><span class="field-value" id="v-months"></span></div>
+          <input type="range" id="s-months" min="0" max="6" step="0.1" value="4.7">
+          <div class="field-sub">Defaults to today's actual date. Drag to test other checkpoints.</div>
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Monthly operating expense rate</span><span class="field-value exp" id="v-opex"></span></div>
+          <input type="range" class="exp" id="s-opex" min="60000" max="140000" step="500" value="94070">
+          <div class="field-sub">Default = actual YTD run rate from the P&amp;L (all expenses incl. officer salary/benefits), not a flat guess</div>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Construction / move remaining</span><span class="field-value exp" id="v-constr"></span></div>
+          <input type="range" class="exp" id="s-constr" min="0" max="700000" step="5000" value="400000">
+          <div class="field-sub">Cash outflow — the actual money still going out the door.</div>
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Depreciation to book by Dec 31 (non-cash)</span><span class="field-value exp" id="v-deprec"></span></div>
+          <input type="range" class="exp" id="s-deprec" min="0" max="400000" step="5000" value="150000">
+          <div class="field-sub">From construction placed in service. Reduces Net Income and the profit-weighted split — split 50/50 like other shared costs (matches how Depreciation Expense was coded in Todd's 2025 packet). Doesn't touch the cash bridge; the cash already moved (or moves) through the construction line above, not through this entry.</div>
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Reserve set aside for next year (total)</span><span class="field-value exp" id="v-reserve"></span></div>
+          <input type="range" class="exp" id="s-reserve" min="0" max="400000" step="5000" value="150000">
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Landlord inflow (Oct 2026)</span><span class="field-value inc" id="v-landlord"></span></div>
+          <input type="range" class="inc" id="s-landlord" min="0" max="200000" step="5000" value="100000">
+        </div>
+      </div>
+    </div>
+
+    <div class="partner-cols" style="margin-top:10px;">
+      <div class="partner-col scott">
+        <div class="partner-head">Scott</div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Remaining income to bill, Aug 10–Dec 31</span><span class="field-value inc" id="v-scottInc"></span></div>
+          <input type="range" class="inc" id="s-scottInc" min="0" max="2000000" step="5000" value="680000">
+          <div class="field-sub">Your estimate. Run-rate off actual YTD billing pace: <span id="scottRunRateNote" class="mono"></span></div>
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Staff bonus pool (Scott's 3 staff)</span><span class="field-value exp" id="v-scottBonus"></span></div>
+          <input type="range" class="exp" id="s-scottBonus" min="0" max="150000" step="1000" value="60000">
+        </div>
+      </div>
+      <div class="partner-col bill">
+        <div class="partner-head">Bill</div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Remaining income to bill, Aug 10–Dec 31</span><span class="field-value inc" id="v-billInc"></span></div>
+          <input type="range" class="inc" id="s-billInc" min="0" max="2000000" step="5000" value="800000">
+          <div class="field-sub">Your estimate. Run-rate off actual YTD billing pace: <span id="billRunRateNote" class="mono"></span></div>
+        </div>
+        <div class="field">
+          <div class="field-top"><span class="field-label">Staff bonus pool (Bill's 3 staff)</span><span class="field-value exp" id="v-billBonus"></span></div>
+          <input type="range" class="exp" id="s-billBonus" min="0" max="150000" step="1000" value="80000">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATE 03 — RESULTS -->
+  <section class="plate">
+    <div class="plate-label"><span class="plate-num">03</span><h2>Projected Year-End Position</h2></div>
+    <p class="plate-note">Firm cash first, then your distributable share — split by each partner's own income and expenses, not a flat 50/50.</p>
+
+    <div class="headline-result">
+      <div class="eyebrow">Projected firm cash on hand, Dec 31, 2026</div>
+      <div class="big" id="firmEnding"></div>
+      <div class="sub" id="firmEndingSub"></div>
+    </div>
+
+    <div class="method">
+      <h3>Distributable Share — Weighted by Individual Income &amp; Expenses</h3>
+      <p class="desc">The pool is weighted by each partner's actual + projected full-year profit contribution, then each partner's own April distribution is subtracted back out — so what's shown is what's still owed to each of you, net of what you've already taken, not a raw weighted slice of today's bank balance.</p>
+      <div class="split-row">
+        <div class="split-name"><span class="dot scott"></span>Scott — weighted entitlement</div>
+        <div style="text-align:right"><div class="split-amount" id="weightedScott"></div><div class="split-pct" id="weightedScottPct"></div></div>
+      </div>
+      <div class="split-row" style="opacity:.75;">
+        <div class="split-name">&nbsp;&nbsp;− already distributed</div>
+        <div style="text-align:right"><div class="split-amount" id="scottDistSub"></div></div>
+      </div>
+      <div class="split-row" style="border-top:2px solid var(--ink); font-weight:600;">
+        <div class="split-name"><span class="dot scott"></span>Scott — net remaining</div>
+        <div style="text-align:right"><div class="split-amount" id="scottNet"></div></div>
+      </div>
+      <div class="split-row" style="margin-top:18px;">
+        <div class="split-name"><span class="dot bill"></span>Bill — weighted entitlement</div>
+        <div style="text-align:right"><div class="split-amount" id="weightedBill"></div><div class="split-pct" id="weightedBillPct"></div></div>
+      </div>
+      <div class="split-row" style="opacity:.75;">
+        <div class="split-name">&nbsp;&nbsp;− already distributed</div>
+        <div style="text-align:right"><div class="split-amount" id="billDistSub"></div></div>
+      </div>
+      <div class="split-row" style="border-top:2px solid var(--ink); font-weight:600;">
+        <div class="split-name"><span class="dot bill"></span>Bill — net remaining</div>
+        <div style="text-align:right"><div class="split-amount" id="billNet"></div></div>
+      </div>
+      <p class="field-sub" id="poolNote" style="margin-top:14px;"></p>
+    </div>
+
+    <div class="waterfall" id="waterfall"></div>
+  </section>
+
+  <footer>
+    <p><strong>Methodology.</strong> Firm ending cash = starting bank balance − construction/move remaining + Scott's remaining income + Bill's remaining income − (monthly opex rate × months remaining) − combined staff bonuses − reserve for next year + landlord inflow. Because the April distributions were paid flat 50/50 but the split below is weighted by production, the model adds those distributions back into the pool before weighting it (so the weighted split isn't distorted by an already-flat payout), then subtracts each partner's own distribution back out — leaving each partner's true net-remaining entitlement, weighted by their YTD net income (shared/unattributed costs split evenly) plus remaining income, less that partner's own projected remaining expense run rate and bonus pool, less that partner's 50% share of depreciation still to be booked this year. Depreciation is deliberately excluded from the cash bridge above — it's a non-cash charge against Net Income, not an actual outflow, so it only affects the weighting, not ending firm cash.</p>
+    <p>This is a planning tool, not tax or accounting advice — reconcile final numbers with Todd Richard at Aprio before treating any figure here as a distribution decision. Figures are cash-basis and pre-tax.</p>
+  </footer>
+
+</div>
+
+<script>
+// ---- Fixed P&L actuals, Jan 1 – Aug 10, 2026 (cash basis) ----
+const PNL = {
+  incomeBill: 985412.76,
+  incomeScott: 916923.97,
+  expenseBill: 289235.93,
+  expenseScott: 168496.55,
+  expenseShared: 135843.56,
+  expenseNotSpecified: 64.97,
+  otherIncomeShared: 7902.14,
+  otherExpenseBill: 52419.87,
+  otherExpenseScott: 47970.53,
+};
+const netIncomeBill = (PNL.incomeBill - PNL.expenseBill) - PNL.otherExpenseBill; // 643,756.96
+const netIncomeScott = (PNL.incomeScott - PNL.expenseScott) - PNL.otherExpenseScott; // 700,456.89
+const sharedNet = (-PNL.expenseShared + PNL.otherIncomeShared); // -127,941.42
+const notSpecifiedNet = -PNL.expenseNotSpecified; // -64.97
+
+const billEffectiveYTD = netIncomeBill + sharedNet/2 + notSpecifiedNet/2;
+const scottEffectiveYTD = netIncomeScott + sharedNet/2 + notSpecifiedNet/2;
+
+// Months elapsed Jan 1 - Aug 10, 2026 (222 days / avg 30.4368-day month)
+const MONTHS_ELAPSED = 222 / 30.4368;
+
+// Direct + shared monthly burn rates (actual, from P&L) — includes each partner's
+// own officer salary/health insurance/payroll tax (the "Other Expenses" section),
+// since that's a real continuing cash outflow through year end, not just the
+// operating "Expenses" section.
+const billDirectMonthly = (PNL.expenseBill + PNL.otherExpenseBill) / MONTHS_ELAPSED;
+const scottDirectMonthly = (PNL.expenseScott + PNL.otherExpenseScott) / MONTHS_ELAPSED;
+const sharedMonthly = (PNL.expenseShared + PNL.expenseNotSpecified - PNL.otherIncomeShared) / MONTHS_ELAPSED; // net shared cost per month
+const totalMonthlyRunRate = billDirectMonthly + scottDirectMonthly + sharedMonthly;
+
+const billIncomeMonthly = PNL.incomeBill / MONTHS_ELAPSED;
+const scottIncomeMonthly = PNL.incomeScott / MONTHS_ELAPSED;
+
+// ---- Default "months remaining" from actual today's date to Dec 31, 2026 ----
+function computeDefaultMonthsRemaining(){
+  const end = new Date(2026,11,31);
+  const now = new Date();
+  const ms = end - now;
+  const days = ms / (1000*60*60*24);
+  return Math.max(0, Math.round((days/30.4368)*10)/10);
+}
+
+const fmt0 = new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0});
+const fmt1pct = (x)=> (x*100).toFixed(1)+'%';
+
+const els = {
+  bank: document.getElementById('s-bank'),
+  months: document.getElementById('s-months'),
+  opex: document.getElementById('s-opex'),
+  constr: document.getElementById('s-constr'),
+  deprec: document.getElementById('s-deprec'),
+  reserve: document.getElementById('s-reserve'),
+  landlord: document.getElementById('s-landlord'),
+  scottInc: document.getElementById('s-scottInc'),
+  billInc: document.getElementById('s-billInc'),
+  scottBonus: document.getElementById('s-scottBonus'),
+  billBonus: document.getElementById('s-billBonus'),
+  scottDist: document.getElementById('s-scottDist'),
+  billDist: document.getElementById('s-billDist'),
+  distReflected: document.getElementById('s-distReflected'),
+};
+
+function update(){
+  const bank = +els.bank.value;
+  const months = +els.months.value;
+  const opex = +els.opex.value;
+  const constr = +els.constr.value;
+  const deprec = +els.deprec.value;
+  const reserve = +els.reserve.value;
+  const landlord = +els.landlord.value;
+  const scottInc = +els.scottInc.value;
+  const billInc = +els.billInc.value;
+  const scottBonus = +els.scottBonus.value;
+  const billBonus = +els.billBonus.value;
+  const scottDist = +els.scottDist.value;
+  const billDist = +els.billDist.value;
+  const distReflected = els.distReflected.checked;
+  const totalDist = scottDist + billDist;
+
+  document.getElementById('v-bank').textContent = fmt0.format(bank);
+  document.getElementById('v-months').textContent = months.toFixed(1)+' mo';
+  document.getElementById('v-opex').textContent = fmt0.format(opex)+'/mo';
+  document.getElementById('v-constr').textContent = fmt0.format(constr);
+  document.getElementById('v-deprec').textContent = fmt0.format(deprec);
+  document.getElementById('v-reserve').textContent = fmt0.format(reserve);
+  document.getElementById('v-landlord').textContent = fmt0.format(landlord);
+  document.getElementById('v-scottInc').textContent = fmt0.format(scottInc);
+  document.getElementById('v-billInc').textContent = fmt0.format(billInc);
+  document.getElementById('v-scottBonus').textContent = fmt0.format(scottBonus);
+  document.getElementById('v-billBonus').textContent = fmt0.format(billBonus);
+  document.getElementById('v-scottDist').textContent = fmt0.format(scottDist);
+  document.getElementById('v-billDist').textContent = fmt0.format(billDist);
+  document.getElementById('scottUndist').textContent = fmt0.format(scottEffectiveYTD - scottDist);
+  document.getElementById('billUndist').textContent = fmt0.format(billEffectiveYTD - billDist);
+
+  const totalBonus = scottBonus + billBonus;
+  const remainingOpex = opex * months;
+
+  // Bridge run off the raw bank balance, before correcting for the distribution split
+  const bridgeFromBank = bank - constr + scottInc + billInc - remainingOpex - totalBonus - reserve + landlord;
+
+  // Pool available to WEIGHT: if the bank balance already nets out the April distributions
+  // (flat 50/50), add them back so the weighted split isn't distorted by that flat payout.
+  // If the bank balance predates the distributions, the pool is already gross — don't add again.
+  const grossPool = bridgeFromBank + (distReflected ? totalDist : 0);
+
+  // Real ending cash in the firm is always the gross pool minus whatever's been / will be paid out.
+  const firmEnding = grossPool - totalDist;
+
+  document.getElementById('firmEnding').textContent = fmt0.format(firmEnding);
+  document.getElementById('firmEndingSub').textContent =
+    `${fmt0.format(bank)} − ${fmt0.format(constr)} construction + ${fmt0.format(scottInc+billInc)} remaining income − ${fmt0.format(remainingOpex)} opex (${months.toFixed(1)} mo) − ${fmt0.format(totalBonus)} bonuses − ${fmt0.format(reserve)} reserve + ${fmt0.format(landlord)} landlord${distReflected ? '' : ` − ${fmt0.format(totalDist)} distributions still owed`}`;
+
+  // Distributable split — weighted by projected full-year production
+  const scottRemainingExpense = (scottDirectMonthly + sharedMonthly/2) * months;
+  const billRemainingExpense = (billDirectMonthly + sharedMonthly/2) * months;
+
+  const scottFullYearProfit = scottEffectiveYTD + scottInc - scottRemainingExpense - scottBonus - deprec/2;
+  const billFullYearProfit = billEffectiveYTD + billInc - billRemainingExpense - billBonus - deprec/2;
+  const combined = scottFullYearProfit + billFullYearProfit;
+
+  const scottShare = combined !== 0 ? scottFullYearProfit / combined : 0.5;
+  const billShare = 1 - scottShare;
+
+  const scottGrossEntitlement = grossPool * scottShare;
+  const billGrossEntitlement = grossPool * billShare;
+  const scottNetRemaining = scottGrossEntitlement - scottDist;
+  const billNetRemaining = billGrossEntitlement - billDist;
+
+  document.getElementById('weightedScott').textContent = fmt0.format(scottGrossEntitlement);
+  document.getElementById('weightedBill').textContent = fmt0.format(billGrossEntitlement);
+  document.getElementById('weightedScottPct').textContent = fmt1pct(scottShare) + ' of profit contribution';
+  document.getElementById('weightedBillPct').textContent = fmt1pct(billShare) + ' of profit contribution';
+  document.getElementById('scottDistSub').textContent = '(' + fmt0.format(scottDist) + ')';
+  document.getElementById('billDistSub').textContent = '(' + fmt0.format(billDist) + ')';
+  document.getElementById('scottNet').textContent = fmt0.format(scottNetRemaining);
+  document.getElementById('billNet').textContent = fmt0.format(billNetRemaining);
+  document.getElementById('poolNote').textContent =
+    `Weighted pool: ${fmt0.format(grossPool)} = ${fmt0.format(bridgeFromBank)} bridge from bank ${distReflected ? '+ ' + fmt0.format(totalDist) + ' added back (already paid, flat 50/50)' : '(distributions not yet reflected in bank balance)'}. Net-remaining lines sum to ${fmt0.format(scottNetRemaining + billNetRemaining)}, which ties to ending firm cash above.`;
+
+  // Waterfall
+  const steps = [
+    {label:'Starting bank balance', amount: bank, type:'start'},
+    {label:'− Construction / move', amount: -constr, type:'neg'},
+    {label:'+ Remaining income', amount: scottInc+billInc, type:'pos'},
+    {label:'− Operating expense', amount: -remainingOpex, type:'neg'},
+    {label:'− Staff bonuses', amount: -totalBonus, type:'neg'},
+    {label:'− Reserve for next year', amount: -reserve, type:'neg'},
+    {label:'+ Landlord inflow', amount: landlord, type:'pos'},
+    ...(distReflected ? [] : [{label:'− Distributions still owed (Apr)', amount: -totalDist, type:'neg'}]),
+    {label:'Ending firm cash', amount: firmEnding, type:'end'},
+  ];
+  const maxAbs = Math.max(bank, Math.abs(firmEnding), ...steps.map(s=>Math.abs(s.amount)));
+  const wf = document.getElementById('waterfall');
+  wf.innerHTML = steps.map(s=>{
+    const pct = Math.min(100, (Math.abs(s.amount)/maxAbs)*100);
+    const cls = s.type==='start' ? '' : s.type==='end' ? 'end' : (s.amount>=0?'pos':'neg');
+    return `<div class="wf-row">
+      <div class="wf-label">${s.label}</div>
+      <div class="wf-bar-track"><div class="wf-bar ${cls}" style="width:${pct}%"></div></div>
+      <div class="wf-amount">${fmt0.format(s.amount)}</div>
+    </div>`;
+  }).join('');
+}
+
+Object.values(els).forEach(el => { el.addEventListener('input', update); el.addEventListener('change', update); });
+
+// Run-rate reference notes
+document.getElementById('opexRateNote').textContent = fmt0.format(totalMonthlyRunRate);
+document.getElementById('scottRunRateNote').textContent = fmt0.format(scottIncomeMonthly * (+els.months.value)) + ' (' + fmt0.format(scottIncomeMonthly) + '/mo)';
+document.getElementById('billRunRateNote').textContent = fmt0.format(billIncomeMonthly * (+els.months.value)) + ' (' + fmt0.format(billIncomeMonthly) + '/mo)';
+
+// Today label + default months remaining
+const defaultMonths = computeDefaultMonthsRemaining();
+els.months.value = defaultMonths;
+const now = new Date();
+document.getElementById('todayLabel').textContent = 'viewed ' + now.toLocaleDateString('en-US',{month:'long', day:'numeric', year:'numeric'}) + ' — ' + defaultMonths.toFixed(1) + ' months remain to Dec 31';
+
+
+update();
+</script>
+</body>
+</html>
