@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#FBF6EE"/>
+  <rect x="2" y="2" width="60" height="60" fill="none" stroke="#A2512D" stroke-width="2"/>
+  <text x="32" y="37" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="20" font-weight="700" fill="#A2512D" letter-spacing="1">CMA</text>
+  <rect x="12" y="45" width="40" height="2" fill="#A2512D"/>
+</svg>
